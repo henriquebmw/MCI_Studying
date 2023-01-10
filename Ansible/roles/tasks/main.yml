@@ -1,0 +1,30 @@
+- name: Create temporary folder
+  file:
+    path: "{{ folder_path }}"
+    state: directory
+    mode: "{{ folder_permissions }}"
+    owner: "{{ folder_owner }}"
+
+- name: Mount samba cache folder
+  mount:
+    path: "{{ folder_path }}"
+    src: "{{ cache_instance}}"
+    fstype: cifs
+    opts: "cache=strict,username={{ cache_username }},password={{ cache_password }}"
+
+- name: Verify mount
+  shell: mount | grep " {{folder_path }} "
+  register: mount_result
+  changed_when: mount_result.stdout != ""
+  failed_when: mount_resul.stderr != ""
+
+- hosts: localhost
+  vars:
+    folder_path: "/tmp/myfolder"
+    folder_owner: "myuser"
+    folder_permissions: "755"
+    cache_instance: "//server/share"
+    cache_username: "user"
+    cache_password: "password"
+  roles:
+  - myrole
