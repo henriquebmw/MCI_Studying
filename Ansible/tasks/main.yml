@@ -1,36 +1,66 @@
+#module to automate samba cache creation
 ---
-- name: Create cache samba registry
-  become: true
-  hosts: all
-  remote_user: cache_admin
-
-- name: Create temporary folder
-    file:
-      path: "{{ folder_path }}"
-      state: directory
-      mode: "{{ folder_permissions }}"
-      owner: "{{ folder_owner }}"
-
-- name: Mount samba cache folder
-  mount:
-  path: "{{ folder_path }}"
-  src: "{{ cache_instance}}"
-  fstype: cifs
-  opts: "cache=strict,username={{ cache_username }},password={{ cache_password }}"
-
-- name: Verify mount
-  shell: mount | grep " {{folder_path }} "
-  register: mount_result
-  changed_when: mount_result.stdout != ""
-  failed_when: mount_resul.stderr != ""
-
 - hosts: localhost
-  vars:
-    folder_path: "/tmp/myfolder"
-    folder_owner: "myuser"
-    folder_permissions: "755"
-    cache_instance: "//server/share"
-    cache_username: "user"
-    cache_password: "password"
-  roles:
-  - myrole
+  become: yes
+  tasks:
+    - name: Use the registered var and the file module to remove the temporary file
+      block:
+        - debug:
+            msg: ' Registry of a temporary file'
+      file:
+        path: '{{ tempfile_1.path }}'
+        state: touch
+      when: tempfile_1.path is defined Return Values
+    - debug:
+        msg: ' Never executes when task above fails'
+    - rescue:
+        - debug:
+            msg: 'Fix {{ tempfile_1.path }}'
+
+    - name: Create cache samba registry
+      become: true
+      remote_user: cache_admin
+      vars:
+        myfile: ~/cache_log.txt
+    
+    - name: Create temporary folder
+      file:
+        path: '{{ folder_path }}'
+        state: directory
+        mode: '{{ folder_permissions }}'
+        owner: '{{ folder_owner }}'
+      with_items:
+        - build
+        - results
+        - artifacts
+    
+    - name: Mount samba cache folder
+      mount:
+        path: '{{ folder_path }}'
+      register: st
+      src: '{{ cache_instance}}'
+      fstype: cifs
+      opts: 'cache=strict,username={{ cache_username }},password={{ cache_password }}'
+    
+    - name: Verify mount
+      shell: 'mount | grep " {{folder_path }} "'
+      register: mount_result
+      changed_when: mount_result.stdout != ""
+      failed_when: mount_resul.stderr != ""
+    
+    - name: Delete a temporary Samba directory
+      file: 'path="{{ folder_path }}"'
+      state: absent
+      register: file_output
+    - debug: var=file_output
+      vars:
+        folder_path: /tmp/myfolder
+        tempfile_1.path: /tmp/myfolder/tmpfile
+        folder_owner: myuser
+        folder_permissions: '755'
+        cache_instance: //server/share
+        cache_username: user
+        cache_password: password
+      roles:
+        - myrole
+
